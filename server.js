@@ -24,27 +24,35 @@ let sendingStatus = {
 };
 
 function getChromePath() {
-  // Environment variable takes precedence
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
+  // 1. Check environment variable, but only if it points to an executable file
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (envPath) {
+    try {
+      fs.accessSync(envPath, fs.constants.X_OK);
+      console.log('✅ Using Chrome from PUPPETEER_EXECUTABLE_PATH:', envPath);
+      return envPath;
+    } catch (e) {
+      console.warn('⚠️ PUPPETEER_EXECUTABLE_PATH set but not executable, ignoring');
+    }
+  }
   
-  // Check system paths for a working executable
+  // 2. Try common system paths
   const systemPaths = [
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
     '/snap/bin/chromium'
   ];
-  
   for (const p of systemPaths) {
     try {
-      fs.accessSync(p, fs.constants.X_OK); // Check if executable
+      fs.accessSync(p, fs.constants.X_OK);
+      console.log('✅ Found system Chrome:', p);
       return p;
-    } catch (e) {
-      // Not executable, continue
-    }
+    } catch (e) { /* ignore */ }
   }
   
-  // If nothing works, return null – Puppeteer will use its bundled Chromium
+  // 3. Let Puppeteer use its own discovery (cache dir)
+  console.log('ℹ️ No executable path found – Puppeteer will use its cache.');
   return null;
 }
 
@@ -53,7 +61,7 @@ function initClient() {
   qrCodeData = null;
   
   const chromePath = getChromePath();
-  console.log('Chrome path:', chromePath || 'using bundled Chromium from Puppeteer');
+  console.log('Chrome path:', chromePath || 'using default Puppeteer discovery');
   
   const puppeteerConfig = {
     headless: true,
@@ -123,7 +131,7 @@ function initClient() {
 // Start on boot
 initClient();
 
-// ── Helpers ──
+// ── Helpers ── (unchanged)
 function cleanPhone(phone) {
   let n = phone.toString().replace(/[\s\-\(\)\+\.]/g, '');
   if (n.startsWith('0')) n = '92' + n.slice(1);
@@ -142,7 +150,7 @@ function buildMessage(template, row) {
   return msg;
 }
 
-// ── ROUTES ──
+// ── ROUTES ── (unchanged)
 
 app.get('/api/status', (req, res) => {
   res.json({ status: clientStatus, qr: qrCodeData, sending: sendingStatus });
