@@ -5,7 +5,6 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -25,7 +24,7 @@ let sendingStatus = {
 };
 
 function getChromePath() {
-  // 1. Environment variable
+  // 1. Environment variable (can override)
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
   if (envPath) {
     try {
@@ -37,7 +36,23 @@ function getChromePath() {
     }
   }
   
-  // 2. Render cache
+  // 2. Check our project cache (./chrome-cache)
+  const projectCacheBase = './chrome-cache/chrome';
+  if (fs.existsSync(projectCacheBase)) {
+    try {
+      const dirs = fs.readdirSync(projectCacheBase);
+      for (const dir of dirs) {
+        const chromePath = `${projectCacheBase}/${dir}/chrome-linux64/chrome`;
+        try {
+          fs.accessSync(chromePath, fs.constants.X_OK);
+          console.log('✅ Using Chrome from project cache:', chromePath);
+          return chromePath;
+        } catch (e) { /* try next */ }
+      }
+    } catch (e) { /* ignore */ }
+  }
+  
+  // 3. Render system cache
   const renderCacheBase = '/opt/render/.cache/puppeteer/chrome';
   if (fs.existsSync(renderCacheBase)) {
     try {
@@ -46,14 +61,14 @@ function getChromePath() {
         const chromePath = `${renderCacheBase}/${dir}/chrome-linux64/chrome`;
         try {
           fs.accessSync(chromePath, fs.constants.X_OK);
-          console.log('✅ Using Chrome from Render cache:', chromePath);
+          console.log('✅ Using Chrome from Render system cache:', chromePath);
           return chromePath;
         } catch (e) { /* try next */ }
       }
     } catch (e) { /* ignore */ }
   }
   
-  // 3. System paths
+  // 4. System paths
   const systemPaths = [
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
@@ -68,7 +83,7 @@ function getChromePath() {
     } catch (e) { /* ignore */ }
   }
   
-  // 4. Fallback to Puppeteer's own discovery
+  // 5. Fallback to Puppeteer's own discovery
   console.log('ℹ️ No executable path found – Puppeteer will use its cache.');
   return null;
 }
@@ -103,18 +118,10 @@ function initClient() {
   
   if (chromePath) puppeteerConfig.executablePath = chromePath;
   
-  // Use a local web version cache to avoid parsing errors
-  const versionFilePath = path.resolve(__dirname, './wwebjs_version/2.2412.54.html');
-  const webVersionCache = fs.existsSync(versionFilePath)
-  ? { type: "local", path: versionFilePath }
-  : { type: "remote", remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html" };
-  
-  console.log('📦 Using webVersionCache:', webVersionCache.type === 'local' ? 'local file' : 'remote URL');
-  
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './wa-session' }),
                       puppeteer: puppeteerConfig,
-                      webVersionCache: webVersionCache,
+                      // No webVersionCache – let it use the built‑in cache (patched to be safe)
                       qrMaxRetries: 5,
                       takeoverOnConflict: true,
                       takeoverTimeoutMs: 60000,
@@ -170,7 +177,7 @@ function initClient() {
 // Start on boot
 initClient();
 
-// ── Helpers ──
+// ── Helpers ── (unchanged)
 function cleanPhone(phone) {
   let n = phone.toString().replace(/[\s\-\(\)\+\.]/g, '');
   if (n.startsWith('0')) n = '92' + n.slice(1);
@@ -189,7 +196,8 @@ function buildMessage(template, row) {
   return msg;
 }
 
-// ── ROUTES ──
+// ── ROUTES ── (all unchanged, but I'll include them for completeness)
+
 app.get('/api/status', (req, res) => {
   res.json({ status: clientStatus, qr: qrCodeData, sending: sendingStatus });
 });
