@@ -4,8 +4,7 @@
   "description": "WhatsApp Bulk Messenger",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npx puppeteer browsers install chrome@121"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
