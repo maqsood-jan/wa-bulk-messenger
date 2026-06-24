@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Bulk Messenger</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #25D366; --green-dark: #128C7E; --bg: #f0f2f5;
+  --white: #fff; --border: #e0e0e0; --text: #1a1a2e;
+  --muted: #667085; --danger: #ef4444; --warn: #f59e0b;
+  --radius: 12px; --shadow: 0 2px 16px rgba(0,0,0,0.09);
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+.app { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+
+/* HEADER */
+.header { background: linear-gradient(135deg, #128C7E, #25D366); border-radius: var(--radius); padding: 24px 28px; color: #fff; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; }
+.header-left h1 { font-size: 22px; font-weight: 800; }
+.header-left p { font-size: 13px; opacity: .8; margin-top: 3px; }
+.wa-status { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot.green { background: #adffcb; animation: pulse 1.4s infinite; }
+.dot.red { background: #ff8080; }
+.dot.yellow { background: #ffd700; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+
+/* CARD */
+.card { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.card-title { font-size: 15px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+.card-title .icon { font-size: 18px; }
+
+/* QR */
+.qr-wrap { text-align: center; padding: 20px 0; }
+.qr-wrap img { width: 220px; height: 220px; border-radius: 12px; border: 3px solid var(--green); }
+.qr-instructions { margin-top: 16px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+.qr-instructions strong { color: var(--text); }
+.connected-banner { background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+.connected-banner .icon { font-size: 28px; }
+.connected-banner h3 { font-size: 14px; font-weight: 700; color: #166534; }
+.connected-banner p { font-size: 12px; color: #166534; opacity: .8; margin-top: 2px; }
+
+/* STEPS */
+.steps { display: flex; gap: 0; margin-bottom: 24px; overflow-x: auto; }
+.step { flex: 1; min-width: 120px; padding: 12px 8px; text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); border-bottom: 3px solid var(--border); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.step.active { color: var(--green-dark); border-bottom-color: var(--green); }
+.step.done { color: var(--green); border-bottom-color: var(--green); }
+.step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--border); color: var(--muted); font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+.step.active .step-num { background: var(--green); color: #fff; }
+.step.done .step-num { background: var(--green); color: #fff; }
+
+/* TEMPLATE TABS */
+.tmpl-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.tmpl-tab { padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--white); color: var(--muted); transition: all .15s; }
+.tmpl-tab.active { border-color: var(--green); background: #f0fdf4; color: var(--green-dark); }
+
+/* UPLOAD */
+.upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 36px 20px; text-align: center; cursor: pointer; transition: all .2s; background: #fafafa; }
+.upload-zone:hover, .upload-zone.drag { border-color: var(--green); background: #f0fdf4; }
+.upload-zone .upload-icon { font-size: 42px; margin-bottom: 10px; }
+.upload-zone p { font-size: 14px; color: var(--muted); }
+.upload-zone strong { color: var(--text); }
+input[type=file] { display: none; }
+
+/* FORM */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.form-control { padding: 10px 13px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text); background: var(--white); }
+.form-control:focus { outline: none; border-color: var(--green); }
+textarea.form-control { resize: vertical; font-family: inherit; line-height: 1.6; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 11px 22px; border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all .15s; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { background: var(--green-dark); }
+.btn-green:disabled { background: #a0d4b0; cursor: not-allowed; }
+.btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+.btn-outline:hover { background: var(--bg); }
+.btn-red { background: var(--danger); color: #fff; }
+.btn-warn { background: var(--warn); color: #fff; }
+.btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+/* BADGES */
+.badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+.badge-sent { background: #dcfce7; color: #16a34a; }
+.badge-failed { background: #fee2e2; color: #dc2626; }
+.badge-skipped { background: #fef3c7; color: #d97706; }
+.badge-break { background: #ede9fe; color: #7c3aed; }
+.badge-done { background: #dbeafe; color: #1d4ed8; }
+
+/* PROGRESS */
+.progress-wrap { margin: 16px 0; }
+.progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.progress-track { height: 12px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--green-dark), var(--green)); border-radius: 99px; transition: width .4s ease; }
+
+/* STATS ROW */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.stat-box { background: #f8fafc; border-radius: 9px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+.stat-box .val { font-size: 26px; font-weight: 800; }
+.stat-box .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+.stat-box.s-sent .val { color: #16a34a; }
+.stat-box.s-failed .val { color: var(--danger); }
+.stat-box.s-skipped .val { color: var(--warn); }
+.stat-box.s-total .val { color: var(--text); }
+
+/* LOG */
+.log-box { max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 9px; }
+.log-entry { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+.log-entry:last-child { border-bottom: none; }
+.log-time { color: var(--muted); min-width: 70px; font-family: monospace; }
+.log-name { font-weight: 600; min-width: 120px; }
+.log-msg { flex: 1; color: var(--muted); }
+
+/* CURRENT */
+.current-box { background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 9px; padding: 14px 16px; margin-bottom: 14px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+
+/* PREVIEW */
+.msg-preview { background: #dcf8c6; border-radius: 12px 12px 0 12px; padding: 12px 16px; font-size: 13px; line-height: 1.7; max-width: 320px; margin: 12px 0; border-left: 3px solid var(--green); white-space: pre-wrap; }
+
+/* ALERT */
+.alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 9px; }
+.alert-info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.alert-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+/* TABLE */
+.table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); max-height: 280px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { background: #f8fafc; padding: 9px 12px; text-align: left; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); position: sticky; top: 0; }
+td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+
+/* TEMPLATES DL */
+.dl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.dl-card { border: 1.5px solid var(--border); border-radius: 10px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all .15s; }
+.dl-card:hover { border-color: var(--green); background: #f0fdf4; }
+.dl-card .dl-icon { font-size: 30px; margin-bottom: 8px; }
+.dl-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.dl-card p { font-size: 11px; color: var(--muted); }
+
+.hidden { display: none !important; }
+.section { display: none; }
+.section.active { display: block; }
+
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .dl-grid { grid-template-columns: 1fr; }
+  .header { flex-direction: column; gap: 12px; text-align: center; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>📱 WhatsApp Bulk Messenger</h1>
+      <p>Human-mode · Auto delay · QR login · Excel upload</p>
+    </div>
+    <div class="wa-status">
+      <div class="dot red" id="hdr-dot"></div>
+      <span id="hdr-status">Connecting...</span>
+    </div>
+  </div>
+
+  <!-- STEPS NAV -->
+  <div class="steps">
+    <div class="step active" id="stp-1" onclick="goStep(1)"><div class="step-num">1</div><br>Connect WA</div>
+    <div class="step" id="stp-2" onclick="goStep(2)"><div class="step-num">2</div><br>Upload File</div>
+    <div class="step" id="stp-3" onclick="goStep(3)"><div class="step-num">3</div><br>Message</div>
+    <div class="step" id="stp-4" onclick="goStep(4)"><div class="step-num">4</div><br>Send</div>
+    <div class="step" id="stp-5" onclick="goStep(5)"><div class="step-num">5</div><br>Templates</div>
+  </div>
+
+  <!-- ── STEP 1: CONNECT ── -->
+  <div class="section active" id="sec-1">
+    <div class="card">
+      <div class="card-title"><span class="icon">📲</span> WhatsApp Connection</div>
+
+      <!-- Loading -->
+      <div id="conn-loading" class="alert alert-info">⏳ Starting WhatsApp... please wait a few seconds.</div>
+
+      <!-- QR -->
+      <div id="conn-qr" class="hidden">
+        <div class="qr-wrap">
+          <img id="qr-img" src="" alt="QR Code">
+          <div class="qr-instructions">
+            <strong>Scan this QR code with your phone:</strong><br>
+            WhatsApp → <strong>three dots (⋮)</strong> → <strong>Linked Devices</strong> → <strong>Link a Device</strong>
+          </div>
+        </div>
+        <div class="btn-group" style="justify-content:center">
+          <button class="btn btn-outline" onclick="reconnect()">🔄 Refresh QR</button>
+        </div>
+      </div>
+
+      <!-- Connected -->
+      <div id="conn-ready" class="hidden">
+        <div class="connected-banner">
+          <div class="icon">✅</div>
+          <div>
+            <h3>WhatsApp Connected!</h3>
+            <p>Your WhatsApp is linked and ready to send messages.</p>
+          </div>
+        </div>
+        <div class="btn-group" style="margin-top:14px">
+          <button class="btn btn-green" onclick="goStep(2)">Next: Upload File →</button>
+          <button class="btn btn-outline" onclick="logout()" style="color:var(--danger);border-color:var(--danger)">🔓 Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: UPLOAD ── -->
+  <div class="section" id="sec-2">
+    <div class="card">
+      <div class="card-title"><span class="icon">📂</span> Upload Customer Data</div>
+
+      <div class="tmpl-tabs">
+        <div class="tmpl-tab active" onclick="selectTemplate(1,this)">📋 Balance Reminder</div>
+        <div class="tmpl-tab" onclick="selectTemplate(2,this)">💰 Recovery Reminder</div>
+        <div class="tmpl-tab" onclick="selectTemplate(3,this)">🧾 Sale / Purchase</div>
+      </div>
+
+      <div class="alert alert-info" id="cols-hint">Required columns: <strong>Date, Phone Number, Customer Name, Balance Amount</strong></div>
+
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-inp').click()">
+        <div class="upload-icon">☁️</div>
+        <p><strong>Click here to upload</strong> your Excel or CSV file</p>
+        <p style="margin-top:5px;font-size:12px">Supports .xlsx and .csv</p>
+      </div>
+      <input type="file" id="file-inp" accept=".xlsx,.xls,.csv" onchange="uploadFile(this)">
+
+      <div id="upload-result" class="hidden" style="margin-top:16px">
+        <div class="alert alert-success" id="upload-ok-msg"></div>
+        <div class="table-wrap" style="margin-top:10px">
+          <table><thead id="tbl-head"></thead><tbody id="tbl-body"></tbody></table>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-green" onclick="goStep(3)">Next: Write Message →</button>
+          <button class="btn btn-outline" onclick="clearUpload()">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: MESSAGE ── -->
+  <div class="section" id="sec-3">
+    <div class="card">
+      <div class="card-title"><span class="icon">✍️</span> Write Your Message</div>
+
+      <div class="tmpl-tabs">
+        <div class="tmpl-tab active" onclick="selectTemplate(1,this)">📋 Balance Reminder</div>
+        <div class="tmpl-tab" onclick="selectTemplate(2,this)">💰 Recovery Reminder</div>
+        <div class="tmpl-tab" onclick="selectTemplate(3,this)">🧾 Sale / Purchase</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Message Template — use {Column Name} for dynamic fields</label>
+        <textarea class="form-control" id="msg-tmpl" rows="7" oninput="updatePreview()"></textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="placeholder-chips"></div>
+
+      <div class="form-group">
+        <label>Preview (with sample data)</label>
+        <div class="msg-preview" id="msg-preview">—</div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-green" onclick="goStep(4)">Next: Send Messages →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: SEND ── -->
+  <div class="section" id="sec-4">
+    <div class="card">
+      <div class="card-title"><span class="icon">⚙️</span> Sending Settings</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Min Delay Between Messages (seconds)</label>
+          <input class="form-control" type="number" id="delay-min" value="8" min="3">
+        </div>
+        <div class="form-group">
+          <label>Max Delay Between Messages (seconds)</label>
+          <input class="form-control" type="number" id="delay-max" value="15" min="5">
+        </div>
+        <div class="form-group">
+          <label>Take a Break Every N Messages</label>
+          <input class="form-control" type="number" id="busy-every" value="25" min="5">
+        </div>
+        <div class="form-group">
+          <label>Break Duration (seconds)</label>
+          <input class="form-control" type="number" id="busy-dur" value="45" min="10">
+        </div>
+      </div>
+      <div class="alert alert-warn">🛡️ <strong>Human-mode ON:</strong> Random delays + typing simulation + automatic breaks. This helps avoid WhatsApp blocking your number.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">📤</span> Send Messages</div>
+
+      <div id="send-not-ready" class="alert alert-warn hidden">⚠️ WhatsApp is not connected. Go to Step 1 first.</div>
+      <div id="send-no-data" class="alert alert-warn hidden">⚠️ No data uploaded. Go to Step 2 first.</div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-box s-total"><div class="val" id="st-total">0</div><div class="lbl">Total</div></div>
+        <div class="stat-box s-sent"><div class="val" id="st-sent">0</div><div class="lbl">Sent ✓</div></div>
+        <div class="stat-box s-failed"><div class="val" id="st-failed">0</div><div class="lbl">Failed ✗</div></div>
+        <div class="stat-box s-skipped"><div class="val" id="st-skipped">0</div><div class="lbl">Skipped</div></div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap">
+        <div class="progress-label"><span id="prog-label">Ready</span><span id="prog-pct">0%</span></div>
+        <div class="progress-track"><div class="progress-fill" id="prog-bar" style="width:0%"></div></div>
+      </div>
+
+      <!-- Current -->
+      <div class="current-box hidden" id="current-box">
+        <div class="dot green"></div>
+        <span id="current-txt">—</span>
+      </div>
+
+      <!-- Buttons -->
+      <div class="btn-group">
+        <button class="btn btn-green" id="btn-start" onclick="startSending()">▶ Start Sending</button>
+        <button class="btn btn-warn hidden" id="btn-pause" onclick="pauseSending()">⏸ Pause</button>
+        <button class="btn btn-green hidden" id="btn-resume" onclick="resumeSending()">▶ Resume</button>
+        <button class="btn btn-red hidden" id="btn-stop" onclick="stopSending()">⏹ Stop</button>
+        <button class="btn btn-outline" onclick="exportReport()">📥 Export Report</button>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span> Live Log</div>
+      <div class="log-box" id="log-box">
+        <div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Logs will appear here when sending starts.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 5: TEMPLATES ── -->
+  <div class="section" id="sec-5">
+    <div class="card">
+      <div class="card-title"><span class="icon">📄</span> Download Sample Templates</div>
+      <div class="dl-grid">
+        <div class="dl-card" onclick="downloadTemplate(1)">
+          <div class="dl-icon">📊</div>
+          <h4>Balance Reminder</h4>
+          <p>Date · Phone · Name · Balance</p>
+          <div style="margin-top:10px"><span class="badge badge-sent">Download XLSX</span></div>
+        </div>
+        <div class="dl-card" onclick="downloadTemplate(2)">
+          <div class="dl-icon">💰</div>
+          <h4>Recovery Reminder</h4>
+          <p>Date · Phone · Name · Recovery</p>
+          <div style="margin-top:10px"><span class="badge badge-sent">Download XLSX</span></div>
+        </div>
+        <div class="dl-card" onclick="downloadTemplate(3)">
+          <div class="dl-icon">🧾</div>
+          <h4>Sale / Purchase</h4>
+          <p>Date · Phone · Name · Weight · Rate · Amount</p>
+          <div style="margin-top:10px"><span class="badge badge-sent">Download XLSX</span></div>
+        </div>
+      </div>
+      <div class="alert alert-info" style="margin-top:16px">
+        📞 <strong>Phone Number format:</strong> Enter with country code. Examples: 923001234567 or +923001234567. For Pakistan numbers starting with 0, the system auto-converts them.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── STATE ──
+const TEMPLATES = {
+  1: {
+    name: 'Balance Reminder',
+    cols: ['Date','Phone Number','Customer Name','Balance Amount'],
+    msg: 'Dear {Customer Name},\n\nAs of {Date}, your outstanding balance is *{Balance Amount}*.\n\nKindly arrange payment at your earliest convenience.\n\nThank you 🙏',
+    sample: { Date:'23/06/2026', 'Phone Number':'+923001234567', 'Customer Name':'Ahmed Khan', 'Balance Amount':'Rs. 25,000' }
+  },
+  2: {
+    name: 'Recovery Reminder',
+    cols: ['Date','Phone Number','Customer Name','Recovery Amount'],
+    msg: 'Dear {Customer Name},\n\nAs of {Date}, your recovery amount is *{Recovery Amount}*.\n\nPlease arrange payment as soon as possible.\n\nThank you 🙏',
+    sample: { Date:'23/06/2026', 'Phone Number':'+923001234567', 'Customer Name':'Fatima Malik', 'Recovery Amount':'Rs. 12,500' }
+  },
+  3: {
+    name: 'Sale/Purchase Info',
+    cols: ['Date','Phone Number','Customer Name','Weight','Rate','Amount'],
+    msg: 'Dear {Customer Name},\n\n📦 Transaction Details\nDate: {Date}\nWeight: {Weight}\nRate: {Rate}\nAmount: *{Amount}*\n\nThank you for your business 🙏',
+    sample: { Date:'23/06/2026', 'Phone Number':'+923001234567', 'Customer Name':'Ali Raza', Weight:'50 kg', Rate:'Rs. 150/kg', Amount:'Rs. 7,500' }
+  }
+};
+
+let currentTemplate = 1;
+let uploadedRows = [];
+let sendLogs = [];
+let pollInterval = null;
+
+// ── NAVIGATION ──
+function goStep(n) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-'+n).classList.add('active');
+  document.querySelectorAll('.step').forEach((s,i) => {
+    s.classList.remove('active');
+    if(i+1 < n) s.classList.add('done');
+    else s.classList.remove('done');
+  });
+  document.getElementById('stp-'+n).classList.add('active');
+  if(n===3) loadCompose();
+  if(n===4) checkSendReady();
+}
+
+// ── STATUS POLLING ──
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    updateConnectionUI(d.status, d.qr);
+    if(d.sending) updateSendingUI(d.sending);
+  } catch(e) {}
+}
+
+function updateConnectionUI(status, qr) {
+  const dot = document.getElementById('hdr-dot');
+  const txt = document.getElementById('hdr-status');
+  document.getElementById('conn-loading').classList.add('hidden');
+  document.getElementById('conn-qr').classList.add('hidden');
+  document.getElementById('conn-ready').classList.add('hidden');
+
+  if(status === 'qr') {
+    dot.className = 'dot yellow';
+    txt.textContent = 'Scan QR Code';
+    document.getElementById('conn-qr').classList.remove('hidden');
+    if(qr) document.getElementById('qr-img').src = qr;
+  } else if(status === 'ready' || status === 'authenticated') {
+    dot.className = 'dot green';
+    txt.textContent = 'Connected ✓';
+    document.getElementById('conn-ready').classList.remove('hidden');
+  } else if(status === 'loading') {
+    dot.className = 'dot yellow';
+    txt.textContent = 'Starting...';
+    document.getElementById('conn-loading').classList.remove('hidden');
+  } else {
+    dot.className = 'dot red';
+    txt.textContent = 'Disconnected';
+    document.getElementById('conn-loading').classList.remove('hidden');
+    document.getElementById('conn-loading').textContent = '⏳ Starting WhatsApp... please wait.';
+  }
+}
+
+function updateSendingUI(s) {
+  document.getElementById('st-total').textContent = s.total;
+  document.getElementById('st-sent').textContent = s.sent;
+  document.getElementById('st-failed').textContent = s.failed;
+  document.getElementById('st-skipped').textContent = s.skipped;
+
+  const done = s.sent + s.failed + s.skipped;
+  const pct = s.total ? Math.round(done/s.total*100) : 0;
+  document.getElementById('prog-bar').style.width = pct+'%';
+  document.getElementById('prog-pct').textContent = pct+'%';
+  document.getElementById('prog-label').textContent = s.running ? (s.paused ? '⏸ Paused' : '📤 Sending...') : (pct===100 ? '✅ Completed!' : 'Ready');
+
+  const currBox = document.getElementById('current-box');
+  if(s.running && s.current) {
+    currBox.classList.remove('hidden');
+    document.getElementById('current-txt').textContent = 'Sending to: ' + s.current;
+  } else {
+    currBox.classList.add('hidden');
+  }
+
+  // Render logs
+  if(s.log && s.log.length) {
+    sendLogs = s.log;
+    renderLogs();
+  }
+
+  // Button states
+  if(s.running && !s.paused) {
+    document.getElementById('btn-start').classList.add('hidden');
+    document.getElementById('btn-pause').classList.remove('hidden');
+    document.getElementById('btn-resume').classList.add('hidden');
+    document.getElementById('btn-stop').classList.remove('hidden');
+  } else if(s.running && s.paused) {
+    document.getElementById('btn-start').classList.add('hidden');
+    document.getElementById('btn-pause').classList.add('hidden');
+    document.getElementById('btn-resume').classList.remove('hidden');
+    document.getElementById('btn-stop').classList.remove('hidden');
+  } else {
+    document.getElementById('btn-start').classList.remove('hidden');
+    document.getElementById('btn-pause').classList.add('hidden');
+    document.getElementById('btn-resume').classList.add('hidden');
+    document.getElementById('btn-stop').classList.add('hidden');
+  }
+}
+
+function renderLogs() {
+  const box = document.getElementById('log-box');
+  if(!sendLogs.length) return;
+  const statusClass = { sent:'badge-sent', failed:'badge-failed', skipped:'badge-skipped', break:'badge-break', done:'badge-done' };
+  box.innerHTML = sendLogs.map(l => `
+    <div class="log-entry">
+      <span class="log-time">${l.time}</span>
+      <span class="log-name">${l.name||'System'}</span>
+      <span class="log-msg">${l.msg}</span>
+      <span class="badge ${statusClass[l.status]||'badge-sent'}">${l.status}</span>
+    </div>`).join('');
+}
+
+// ── TEMPLATE SELECTION ──
+function selectTemplate(n, el) {
+  currentTemplate = n;
+  document.querySelectorAll('.tmpl-tab').forEach(t => t.classList.remove('active'));
+  if(el) {
+    // Mark all tabs with same index
+    document.querySelectorAll('.tmpl-tab').forEach((t,i) => {
+      const tabs = document.querySelectorAll('.tmpl-tab');
+      if(t === el) t.classList.add('active');
+    });
+    el.classList.add('active');
+  }
+  const t = TEMPLATES[n];
+  const colsHint = document.getElementById('cols-hint');
+  if(colsHint) colsHint.innerHTML = `Required columns: <strong>${t.cols.join(', ')}</strong>`;
+  loadCompose();
+}
+
+// ── UPLOAD ──
+async function uploadFile(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch('/api/upload', { method:'POST', body: fd });
+    const d = await r.json();
+    if(!d.ok) { alert('Error: ' + d.error); return; }
+    uploadedRows = d.rows;
+    document.getElementById('upload-ok-msg').textContent = `✅ ${d.count} records loaded successfully!`;
+    // Build table
+    const cols = d.columns;
+    document.getElementById('tbl-head').innerHTML = '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+    document.getElementById('tbl-body').innerHTML = d.rows.slice(0,8).map(r=>'<tr>'+cols.map(c=>`<td>${r[c]||''}</td>`).join('')+'</tr>').join('');
+    document.getElementById('upload-result').classList.remove('hidden');
+  } catch(e) {
+    alert('Upload failed: ' + e.message);
+  }
+}
+
+function clearUpload() {
+  uploadedRows = [];
+  document.getElementById('upload-result').classList.add('hidden');
+  document.getElementById('file-inp').value = '';
+}
+
+// ── COMPOSE ──
+function loadCompose() {
+  const t = TEMPLATES[currentTemplate];
+  const el = document.getElementById('msg-tmpl');
+  if(el && !el.value.trim()) el.value = t.msg;
+  updatePreview();
+  renderChips();
+}
+
+function updatePreview() {
+  const tmpl = document.getElementById('msg-tmpl');
+  if(!tmpl) return;
+  const t = TEMPLATES[currentTemplate];
+  let msg = tmpl.value;
+  for(const [k,v] of Object.entries(t.sample)) msg = msg.replaceAll(`{${k}}`, v);
+  document.getElementById('msg-preview').textContent = msg;
+}
+
+function renderChips() {
+  const el = document.getElementById('placeholder-chips');
+  if(!el) return;
+  const t = TEMPLATES[currentTemplate];
+  el.innerHTML = t.cols.map(c=>`<span onclick="insertChip('{${c}}')" style="background:#f0fdf4;border:1.5px solid #86efac;color:#166534;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">{${c}}</span>`).join('');
+}
+
+function insertChip(p) {
+  const el = document.getElementById('msg-tmpl');
+  const pos = el.selectionStart;
+  el.value = el.value.slice(0,pos)+p+el.value.slice(el.selectionEnd);
+  el.focus();
+  updatePreview();
+}
+
+// ── SEND ──
+function checkSendReady() {
+  const r1 = document.getElementById('send-not-ready');
+  const r2 = document.getElementById('send-no-data');
+  fetch('/api/status').then(r=>r.json()).then(d=>{
+    r1.classList.toggle('hidden', d.status==='ready');
+    r2.classList.toggle('hidden', uploadedRows.length > 0);
+    document.getElementById('st-total').textContent = uploadedRows.length;
+    if(d.sending) updateSendingUI(d.sending);
+  });
+}
+
+async function startSending() {
+  if(!uploadedRows.length) { alert('Please upload data first!'); return; }
+  const tmpl = document.getElementById('msg-tmpl').value;
+  if(!tmpl.trim()) { alert('Please write a message template first!'); return; }
+
+  const payload = {
+    rows: uploadedRows,
+    template: tmpl,
+    delayMin: document.getElementById('delay-min').value,
+    delayMax: document.getElementById('delay-max').value,
+    busyEvery: document.getElementById('busy-every').value,
+    busyDuration: document.getElementById('busy-dur').value
+  };
+
+  try {
+    const r = await fetch('/api/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const d = await r.json();
+    if(!d.ok) alert('Error: ' + d.error);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function pauseSending() { await fetch('/api/pause', {method:'POST'}); }
+async function resumeSending() { await fetch('/api/resume', {method:'POST'}); }
+async function stopSending() { if(confirm('Stop sending?')) await fetch('/api/stop', {method:'POST'}); }
+
+async function reconnect() {
+  await fetch('/api/reconnect', {method:'POST'});
+  document.getElementById('conn-loading').classList.remove('hidden');
+  document.getElementById('conn-qr').classList.add('hidden');
+}
+
+async function logout() {
+  if(!confirm('Logout from WhatsApp? You will need to scan QR again.')) return;
+  await fetch('/api/logout', {method:'POST'});
+}
+
+async function exportReport() {
+  if(!sendLogs.length) { alert('No logs to export yet.'); return; }
+  const r = await fetch('/api/export', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({logs: sendLogs}) });
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'wa-report.xlsx';
+  a.click();
+}
+
+function downloadTemplate(n) {
+  window.open('/api/template/'+n, '_blank');
+}
+
+// ── INIT ──
+loadCompose();
+pollStatus();
+pollInterval = setInterval(pollStatus, 2000);
+</script>
+</body>
+</html>
