@@ -24,7 +24,7 @@ let sendingStatus = {
 };
 
 function getChromePath() {
-  // 1. Check environment variable, but only if it points to an executable file
+  // 1. Check environment variable (user override)
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
   if (envPath) {
     try {
@@ -36,7 +36,27 @@ function getChromePath() {
     }
   }
   
-  // 2. Try common system paths
+  // 2. Check Render cache directory (where build script installs Chrome)
+  const renderCacheBase = '/opt/render/.cache/puppeteer/chrome';
+  if (fs.existsSync(renderCacheBase)) {
+    try {
+      const dirs = fs.readdirSync(renderCacheBase);
+      for (const dir of dirs) {
+        const chromePath = `${renderCacheBase}/${dir}/chrome-linux64/chrome`;
+        try {
+          fs.accessSync(chromePath, fs.constants.X_OK);
+          console.log('✅ Using Chrome from Render cache:', chromePath);
+          return chromePath;
+        } catch (e) {
+          // not executable, try next
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not read Render cache directory:', e.message);
+    }
+  }
+  
+  // 3. Try common system paths
   const systemPaths = [
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
@@ -51,7 +71,7 @@ function getChromePath() {
     } catch (e) { /* ignore */ }
   }
   
-  // 3. Let Puppeteer use its own discovery (cache dir)
+  // 4. Let Puppeteer use its own discovery (may still fail if cache not persisted)
   console.log('ℹ️ No executable path found – Puppeteer will use its cache.');
   return null;
 }
@@ -84,7 +104,6 @@ function initClient() {
     ]
   };
   
-  // Only set executablePath if we found a valid one
   if (chromePath) puppeteerConfig.executablePath = chromePath;
   
   client = new Client({
@@ -131,7 +150,7 @@ function initClient() {
 // Start on boot
 initClient();
 
-// ── Helpers ── (unchanged)
+// ── Helpers ──
 function cleanPhone(phone) {
   let n = phone.toString().replace(/[\s\-\(\)\+\.]/g, '');
   if (n.startsWith('0')) n = '92' + n.slice(1);
@@ -150,7 +169,7 @@ function buildMessage(template, row) {
   return msg;
 }
 
-// ── ROUTES ── (unchanged)
+// ── ROUTES ──
 
 app.get('/api/status', (req, res) => {
   res.json({ status: clientStatus, qr: qrCodeData, sending: sendingStatus });
