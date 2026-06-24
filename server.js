@@ -25,7 +25,7 @@ let sendingStatus = {
 };
 
 function getChromePath() {
-  // 1. Check environment variable
+  // 1. Environment variable
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
   if (envPath) {
     try {
@@ -37,7 +37,7 @@ function getChromePath() {
     }
   }
   
-  // 2. Check Render cache directory (where build script installs Chrome)
+  // 2. Render cache
   const renderCacheBase = '/opt/render/.cache/puppeteer/chrome';
   if (fs.existsSync(renderCacheBase)) {
     try {
@@ -53,7 +53,7 @@ function getChromePath() {
     } catch (e) { /* ignore */ }
   }
   
-  // 3. Try common system paths
+  // 3. System paths
   const systemPaths = [
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
@@ -68,7 +68,7 @@ function getChromePath() {
     } catch (e) { /* ignore */ }
   }
   
-  // 4. Let Puppeteer use its own discovery
+  // 4. Fallback to Puppeteer's own discovery
   console.log('ℹ️ No executable path found – Puppeteer will use its cache.');
   return null;
 }
@@ -97,18 +97,24 @@ function initClient() {
       '--disable-translate',
       '--mute-audio',
       '--safebrowsing-disable-auto-update',
-      '--window-size=1280,720' // helps with rendering
+      '--window-size=1280,720'
     ]
   };
   
   if (chromePath) puppeteerConfig.executablePath = chromePath;
   
-  // We'll use the default LocalWebCache and let it create the cache in .wwebjs_cache
+  // Use a local web version cache to avoid parsing errors
+  const versionFilePath = path.resolve(__dirname, './wwebjs_version/2.2412.54.html');
+  const webVersionCache = fs.existsSync(versionFilePath)
+  ? { type: "local", path: versionFilePath }
+  : { type: "remote", remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html" };
+  
+  console.log('📦 Using webVersionCache:', webVersionCache.type === 'local' ? 'local file' : 'remote URL');
+  
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './wa-session' }),
                       puppeteer: puppeteerConfig,
-                      // Do NOT set webVersionCache – let it use the built‑in cache.
-                      // This will create a .wwebjs_cache folder with the correct version.
+                      webVersionCache: webVersionCache,
                       qrMaxRetries: 5,
                       takeoverOnConflict: true,
                       takeoverTimeoutMs: 60000,
@@ -147,7 +153,6 @@ function initClient() {
     client = null;
   });
   
-  // Also listen to loading_screen event for debug
   client.on('loading_screen', (percent, message) => {
     console.log(`🔄 Loading: ${percent}% - ${message}`);
   });
@@ -212,7 +217,6 @@ app.post('/api/logout', async (req, res) => {
     }
     const sessionDir = './wa-session';
     if (fs.existsSync(sessionDir)) fs.rmSync(sessionDir, { recursive: true, force: true });
-    // Also remove the .wwebjs_cache to force fresh download
     const cacheDir = './.wwebjs_cache';
     if (fs.existsSync(cacheDir)) fs.rmSync(cacheDir, { recursive: true, force: true });
     clientStatus = 'disconnected';
