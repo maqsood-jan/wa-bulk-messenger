@@ -5,6 +5,7 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const cors = require('cors');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -24,7 +25,7 @@ let sendingStatus = {
 };
 
 function getChromePath() {
-  // 1. Check environment variable (user override)
+  // 1. Check environment variable
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
   if (envPath) {
     try {
@@ -47,13 +48,9 @@ function getChromePath() {
           fs.accessSync(chromePath, fs.constants.X_OK);
           console.log('✅ Using Chrome from Render cache:', chromePath);
           return chromePath;
-        } catch (e) {
-          // not executable, try next
-        }
+        } catch (e) { /* try next */ }
       }
-    } catch (e) {
-      console.warn('⚠️ Could not read Render cache directory:', e.message);
-    }
+    } catch (e) { /* ignore */ }
   }
   
   // 3. Try common system paths
@@ -71,7 +68,7 @@ function getChromePath() {
     } catch (e) { /* ignore */ }
   }
   
-  // 4. Let Puppeteer use its own discovery (cache dir)
+  // 4. Let Puppeteer use its own discovery
   console.log('ℹ️ No executable path found – Puppeteer will use its cache.');
   return null;
 }
@@ -99,20 +96,20 @@ function initClient() {
       '--disable-sync',
       '--disable-translate',
       '--mute-audio',
-      '--safebrowsing-disable-auto-update'
+      '--safebrowsing-disable-auto-update',
+      '--window-size=1280,720' // helps with rendering
     ]
   };
   
   if (chromePath) puppeteerConfig.executablePath = chromePath;
   
+  // We'll use the default LocalWebCache and let it create the cache in .wwebjs_cache
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './wa-session' }),
                       puppeteer: puppeteerConfig,
-                      webVersionCache: {
-                        type: "remote",
-                        remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
-                      },
-                      qrMaxRetries: 3,
+                      // Do NOT set webVersionCache – let it use the built‑in cache.
+                      // This will create a .wwebjs_cache folder with the correct version.
+                      qrMaxRetries: 5,
                       takeoverOnConflict: true,
                       takeoverTimeoutMs: 60000,
   });
@@ -127,15 +124,16 @@ function initClient() {
     }
   });
   
+  client.on('authenticated', () => {
+    console.log('✅ Authenticated successfully – waiting for ready...');
+    clientStatus = 'authenticated';
+  });
+  
   client.on('ready', () => {
     console.log('✅ WhatsApp client is ready!');
     clientStatus = 'ready';
     qrCodeData = null;
-  });
-  
-  client.on('authenticated', () => {
-    console.log('✅ Authenticated successfully');
-    clientStatus = 'authenticated';
+    console.log('🎉 You can now send messages.');
   });
   
   client.on('auth_failure', (msg) => {
@@ -147,7 +145,11 @@ function initClient() {
     console.log('❌ Disconnected:', reason);
     clientStatus = 'disconnected';
     client = null;
-    // Do not auto-reconnect; let the user trigger via /api/reconnect
+  });
+  
+  // Also listen to loading_screen event for debug
+  client.on('loading_screen', (percent, message) => {
+    console.log(`🔄 Loading: ${percent}% - ${message}`);
   });
   
   client.initialize()
@@ -183,7 +185,6 @@ function buildMessage(template, row) {
 }
 
 // ── ROUTES ──
-
 app.get('/api/status', (req, res) => {
   res.json({ status: clientStatus, qr: qrCodeData, sending: sendingStatus });
 });
@@ -211,6 +212,9 @@ app.post('/api/logout', async (req, res) => {
     }
     const sessionDir = './wa-session';
     if (fs.existsSync(sessionDir)) fs.rmSync(sessionDir, { recursive: true, force: true });
+    // Also remove the .wwebjs_cache to force fresh download
+    const cacheDir = './.wwebjs_cache';
+    if (fs.existsSync(cacheDir)) fs.rmSync(cacheDir, { recursive: true, force: true });
     clientStatus = 'disconnected';
     setTimeout(() => initClient(), 1000);
     res.json({ ok: true });
