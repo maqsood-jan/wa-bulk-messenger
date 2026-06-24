@@ -24,21 +24,27 @@ let sendingStatus = {
 };
 
 function getChromePath() {
-  // Try environment variable first
+  // Environment variable takes precedence
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  // Try known Render path
-  const renderPath = '/opt/render/project/src/.cache/puppeteer/chrome/linux-121.0.6167.85/chrome-linux64/chrome';
-  if (fs.existsSync(renderPath)) return renderPath;
-  // Try system chrome
+  
+  // Check system paths for a working executable
   const systemPaths = [
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
     '/snap/bin/chromium'
   ];
+  
   for (const p of systemPaths) {
-    if (fs.existsSync(p)) return p;
+    try {
+      fs.accessSync(p, fs.constants.X_OK); // Check if executable
+      return p;
+    } catch (e) {
+      // Not executable, continue
+    }
   }
+  
+  // If nothing works, return null – Puppeteer will use its bundled Chromium
   return null;
 }
 
@@ -47,7 +53,7 @@ function initClient() {
   qrCodeData = null;
   
   const chromePath = getChromePath();
-  console.log('Chrome path:', chromePath || 'using bundled');
+  console.log('Chrome path:', chromePath || 'using bundled Chromium from Puppeteer');
   
   const puppeteerConfig = {
     headless: true,
@@ -70,6 +76,7 @@ function initClient() {
     ]
   };
   
+  // Only set executablePath if we found a valid one
   if (chromePath) puppeteerConfig.executablePath = chromePath;
   
   client = new Client({
@@ -103,14 +110,12 @@ function initClient() {
     console.log('Disconnected:', reason);
     clientStatus = 'disconnected';
     client = null;
-    // Auto reconnect after 5 seconds
     setTimeout(() => initClient(), 5000);
   });
   
   client.initialize().catch(err => {
     console.error('Init error:', err.message);
     clientStatus = 'error';
-    // Retry after 10 seconds
     setTimeout(() => initClient(), 10000);
   });
 }
